@@ -4,15 +4,14 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/umbracle/minimal/state"
 )
 
-func buildPrestate(preState state.PreStates) (*state.State, *state.Snapshot) {
-	s := state.NewState(NewState(NewMemoryStorage()))
-	snap, _ := s.NewSnapshot(common.Hash{})
+func buildPrestate(preState state.PreStates) (state.State, state.Snapshot) {
+	s := NewState(NewMemoryStorage())
+	snap := s.NewSnapshot()
 
-	txn := snap.Txn()
+	txn := state.NewTxn(s, snap)
 	for i, j := range preState {
 		txn.SetNonce(i, j.Nonce)
 		txn.SetBalance(i, big.NewInt(int64(j.Balance)))

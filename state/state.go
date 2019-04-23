@@ -11,46 +11,15 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix"
 )
 
-// TODO, remove this structures since they are redundant
-
-type State struct {
-	state StateX
-}
-
-func NewState(state StateX) *State {
-	return &State{state: state}
-}
-
-func (s *State) NewSnapshot(root common.Hash) (*Snapshot, bool) {
-	t, err := s.state.NewTrieAt(root)
-	if err != nil {
-		panic(err)
-	}
-	return &Snapshot{state: s, tt: t}, true
-}
-
-type Snapshot struct {
-	state *State
-	tt    TrieX
-}
-
-func (s *Snapshot) Txn() *Txn {
-	return newTxn(s.state, s)
-}
-
-func (s *Snapshot) Get(k []byte) ([]byte, bool) {
-	return s.tt.Get(k)
-}
-
-type StateX interface {
-	NewTrieAt(common.Hash) (TrieX, error)
-	NewTrie() TrieX
+type State interface {
+	NewSnapshotAt(common.Hash) (Snapshot, error)
+	NewSnapshot() Snapshot
 	GetCode(hash common.Hash) ([]byte, bool)
 }
 
-type TrieX interface {
+type Snapshot interface {
 	Get(k []byte) ([]byte, bool)
-	Commit(x *iradix.Tree) (TrieX, []byte)
+	Commit(x *iradix.Tree) (Snapshot, []byte)
 }
 
 // account trie

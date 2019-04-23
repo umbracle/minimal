@@ -33,7 +33,7 @@ type PreState struct {
 // PreStates is a set of pre states
 type PreStates map[common.Address]*PreState
 
-type buildPreState func(p PreStates) (*State, *Snapshot)
+type buildPreState func(p PreStates) (State, Snapshot)
 
 // TestState tests a set of tests on a state
 func TestState(t *testing.T, buildPreState buildPreState) {
@@ -75,14 +75,11 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 	t.Run("", func(t *testing.T) {
 		testChangeAccountBalanceToZero(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
-		testSnapshotUpdateData(t, buildPreState)
-	})
 }
 
 func testWriteState(t *testing.T, buildPreState buildPreState) {
-	_, snap := buildPreState(nil)
-	txn := snap.Txn()
+	state, snap := buildPreState(nil)
+	txn := newTxn(state, snap)
 
 	txn.SetState(addr1, hash1, hash1)
 	txn.SetState(addr1, hash2, hash2)
@@ -96,7 +93,7 @@ func testWriteState(t *testing.T, buildPreState buildPreState) {
 
 	snap, _ = txn.Commit(false)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.GetState(addr1, hash1) != hash1 {
 		t.Fatal()
 	}
@@ -107,26 +104,26 @@ func testWriteState(t *testing.T, buildPreState buildPreState) {
 
 func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 	// Create account and write empty state
-	_, snap := buildPreState(nil)
-	txn := snap.Txn()
+	state, snap := buildPreState(nil)
+	txn := newTxn(state, snap)
 
 	// Without EIP150 the data is added
 	txn.SetState(addr1, hash1, hash0)
 	snap, _ = txn.Commit(false)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if !txn.Exist(addr1) {
 		t.Fatal()
 	}
 
 	_, snap = buildPreState(nil)
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 
 	// With EIP150 the empty data is removed
 	txn.SetState(addr1, hash1, hash0)
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -134,9 +131,9 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 
 func testUpdateStateInPreState(t *testing.T, buildPreState buildPreState) {
 	// update state that was already set in prestate
-	_, snap := buildPreState(defaultPreState)
+	state, snap := buildPreState(defaultPreState)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	if txn.GetState(addr1, hash1) != hash1 {
 		t.Fatal()
 	}
@@ -144,7 +141,7 @@ func testUpdateStateInPreState(t *testing.T, buildPreState buildPreState) {
 	txn.SetState(addr1, hash1, hash2)
 	snap, _ = txn.Commit(false)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.GetState(addr1, hash1) != hash2 {
 		t.Fatal()
 	}
@@ -152,16 +149,16 @@ func testUpdateStateInPreState(t *testing.T, buildPreState buildPreState) {
 
 func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 	// If the state (in prestate) is updated to empty it should be removed
-	_, snap := buildPreState(defaultPreState)
+	state, snap := buildPreState(defaultPreState)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	txn.SetState(addr1, hash1, hash0)
 
 	// TODO, test with false (should not be deleted)
 	// TODO, test with balance on the account and nonce
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -169,13 +166,13 @@ func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 
 func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
 	// Suicide an account created in the prestate
-	_, snap := buildPreState(defaultPreState)
+	state, snap := buildPreState(defaultPreState)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	txn.Suicide(addr1)
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -183,9 +180,9 @@ func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
 
 func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 	// Create a new account and suicide it
-	_, snap := buildPreState(nil)
+	state, snap := buildPreState(nil)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	txn.SetState(addr1, hash1, hash1)
 	txn.Suicide(addr1)
 
@@ -196,7 +193,7 @@ func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -204,9 +201,9 @@ func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 
 func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 	// Data (nonce, balance, code) from a suicided account should be empty
-	_, snap := buildPreState(nil)
+	state, snap := buildPreState(nil)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 
 	txn.SetNonce(addr1, 10)
 	txn.SetBalance(addr1, big.NewInt(100))
@@ -216,7 +213,7 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 	txn.Suicide(addr1)
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 
 	if balance := txn.GetBalance(addr1); balance.Cmp(big.NewInt(0)) != 0 {
 		t.Fatalf("balance should be zero but found: %d", balance)
@@ -240,24 +237,23 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 
 func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
 	// Suicide the coinbase of the block
-	_, snap := buildPreState(defaultPreState)
+	state, snap := buildPreState(defaultPreState)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	txn.Suicide(addr1)
 	txn.AddSealingReward(addr1, big.NewInt(10))
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.GetBalance(addr1).Cmp(big.NewInt(10)) != 0 {
 		t.Fatal()
 	}
 }
 
 func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState) {
-	// Legacy
-	_, snap := buildPreState(defaultPreState)
+	state, snap := buildPreState(defaultPreState)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	txn.SetNonce(addr1, 10)
 	txn.Suicide(addr1)
 
@@ -280,9 +276,9 @@ func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState
 func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
 	// refunds are only valid per single txn so after each
 	// intermediateCommit they have to be restarted
-	_, snap := buildPreState(nil)
+	state, snap := buildPreState(nil)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 
 	txn.AddRefund(1000)
 	if txn.GetRefund() != 1000 {
@@ -303,13 +299,13 @@ func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPre
 		},
 	}
 
-	_, snap := buildPreState(preState)
+	state, snap := buildPreState(preState)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	txn.SetBalance(addr1, big.NewInt(0))
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -317,40 +313,15 @@ func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPre
 
 func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 	// If the balance of the account changes to zero the account is deleted
-	_, snap := buildPreState(nil)
+	state, snap := buildPreState(nil)
 
-	txn := snap.Txn()
+	txn := newTxn(state, snap)
 	txn.SetBalance(addr1, big.NewInt(10))
 	txn.SetBalance(addr1, big.NewInt(0))
 	snap, _ = txn.Commit(true)
 
-	txn = snap.Txn()
+	txn = newTxn(state, snap)
 	if txn.Exist(addr1) {
 		t.Fatal()
-	}
-}
-
-// MOVE OUT
-
-func testSnapshotUpdateData(t *testing.T, buildPreState buildPreState) {
-	// Snapshots should keep the data
-
-	_, snap := buildPreState(nil)
-	txn := snap.Txn()
-
-	txn.SetState(addr1, hash1, hash1)
-	if txn.GetState(addr1, hash1) != hash1 {
-		t.Fail()
-	}
-
-	ss := txn.Snapshot()
-	txn.SetState(addr1, hash1, hash2)
-	if txn.GetState(addr1, hash1) != hash2 {
-		t.Fail()
-	}
-
-	txn.RevertToSnapshot(ss)
-	if txn.GetState(addr1, hash1) != hash1 {
-		t.Fail()
 	}
 }

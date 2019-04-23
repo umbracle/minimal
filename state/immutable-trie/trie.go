@@ -360,7 +360,7 @@ func longestPrefix(k1, k2 []byte) int {
 	return i
 }
 
-func (t *Trie) Commit(x *iradix.Tree) (state.TrieX, []byte) {
+func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 	// this commit runs the transactions and creates a new trie
 	// this is done for at the transaction/block level and deals with updating
 	// internal nodes if necessary, this is, internal account tries dont run

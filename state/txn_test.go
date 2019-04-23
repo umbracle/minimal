@@ -14,10 +14,10 @@ import (
 )
 
 type mockState struct {
-	snapshots map[common.Hash]TrieX
+	snapshots map[common.Hash]Snapshot
 }
 
-func (m *mockState) NewTrieAt(root common.Hash) (TrieX, error) {
+func (m *mockState) NewSnapshotAt(root common.Hash) (Snapshot, error) {
 	t, ok := m.snapshots[root]
 	if !ok {
 		return nil, fmt.Errorf("not found")
@@ -25,7 +25,7 @@ func (m *mockState) NewTrieAt(root common.Hash) (TrieX, error) {
 	return t, nil
 }
 
-func (m *mockState) NewTrie() TrieX {
+func (m *mockState) NewSnapshot() Snapshot {
 	return &mockSnapshot{data: map[string][]byte{}}
 }
 
@@ -42,13 +42,13 @@ func (m *mockSnapshot) Get(k []byte) ([]byte, bool) {
 	return v, ok
 }
 
-func (m *mockSnapshot) Commit(x *iradix.Tree) (TrieX, []byte) {
+func (m *mockSnapshot) Commit(x *iradix.Tree) (Snapshot, []byte) {
 	panic("Not implemented in tests")
 }
 
 func newStateWithPreState(preState map[common.Address]*PreState) (*mockState, *mockSnapshot) {
 	state := &mockState{
-		snapshots: map[common.Hash]TrieX{},
+		snapshots: map[common.Hash]Snapshot{},
 	}
 	snapshot := &mockSnapshot{
 		data: map[string][]byte{},
@@ -63,23 +63,14 @@ func newStateWithPreState(preState map[common.Address]*PreState) (*mockState, *m
 		if err != nil {
 			panic(err)
 		}
-		snapshot.data[addr.String()] = accountRlp
+		snapshot.data[hexutil.Encode(hashit(addr.Bytes()))] = accountRlp
 	}
 
 	return state, snapshot
 }
 
 func newTestTxn(p map[common.Address]*PreState) *Txn {
-	state, snap := newStateWithPreState(p)
-
-	auxState := &State{
-		state: state,
-	}
-	auxSnap := &Snapshot{
-		state: auxState,
-		tt:    snap,
-	}
-	return newTxn(auxState, auxSnap)
+	return newTxn(newStateWithPreState(p))
 }
 
 func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
@@ -116,7 +107,7 @@ func randomHash() common.Hash {
 	return common.BytesToHash(b)
 }
 
-func TestTxn(t *testing.T) {
+func TestSnapshotUpdateData(t *testing.T) {
 	txn := newTestTxn(defaultPreState)
 
 	txn.SetState(addr1, hash1, hash1)

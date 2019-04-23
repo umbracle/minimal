@@ -37,15 +37,19 @@ type GasPool interface {
 
 // Txn is a reference of the state
 type Txn struct {
-	snapshot   *Snapshot
-	state      *State
+	snapshot   Snapshot
+	state      State
 	snapshots  []*iradix.Tree
 	txn        *iradix.Txn
 	gas        uint64
 	initialGas uint64
 }
 
-func newTxn(state *State, snapshot *Snapshot) *Txn {
+func NewTxn(state State, snapshot Snapshot) *Txn {
+	return newTxn(state, snapshot)
+}
+
+func newTxn(state State, snapshot Snapshot) *Txn {
 	i := iradix.New()
 
 	return &Txn{
@@ -105,8 +109,6 @@ func (txn *Txn) getStateObject(addr common.Address) (*StateObject, bool) {
 	}
 
 	data, ok := txn.snapshot.Get(hashit(addr.Bytes()))
-	// From the state we get the account object
-	// data, ok := txn.state.getRoot().Get(hashit(addr.Bytes()))
 	if !ok {
 		return nil, false
 	}
@@ -119,12 +121,9 @@ func (txn *Txn) getStateObject(addr common.Address) (*StateObject, bool) {
 
 	// Load trie from memory if there is some state
 	if account.Root == emptyStateHash {
-		// account.trie = trie.NewTrie()
-		account.Trie = txn.state.state.NewTrie()
+		account.Trie = txn.state.NewSnapshot()
 	} else {
-		// TODO, load from state that keeps a cache of tries
-		// account.trie, err = trie.NewTrieAt(txn.state.storage, account.Root)
-		account.Trie, err = txn.state.state.NewTrieAt(account.Root)
+		account.Trie, err = txn.state.NewSnapshotAt(account.Root)
 		if err != nil {
 			return nil, false
 		}
@@ -141,9 +140,8 @@ func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *S
 	if !exists && create {
 		object = &StateObject{
 			Account: &Account{
-				Balance: big.NewInt(0),
-				// trie:     trie.NewTrie(),
-				Trie:     txn.state.state.NewTrie(),
+				Balance:  big.NewInt(0),
+				Trie:     txn.state.NewSnapshot(),
 				CodeHash: emptyCodeHash,
 				Root:     emptyStateHash,
 			},
@@ -306,8 +304,7 @@ func (txn *Txn) GetCode(addr common.Address) []byte {
 	if object.DirtyCode {
 		return object.Code
 	}
-	code, _ := txn.state.state.GetCode(common.BytesToHash(object.Account.CodeHash))
-	// code, _ := txn.state.GetCode(common.BytesToHash(object.Account.CodeHash))
+	code, _ := txn.state.GetCode(common.BytesToHash(object.Account.CodeHash))
 	return code
 }
 
@@ -404,9 +401,8 @@ func (txn *Txn) Empty(addr common.Address) bool {
 func newStateObject(txn *Txn) *StateObject {
 	return &StateObject{
 		Account: &Account{
-			Balance: big.NewInt(0),
-			// trie:     trie.NewTrie(),
-			Trie:     txn.state.state.NewTrie(),
+			Balance:  big.NewInt(0),
+			Trie:     txn.state.NewSnapshot(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},
@@ -416,9 +412,8 @@ func newStateObject(txn *Txn) *StateObject {
 func (txn *Txn) CreateAccount(addr common.Address) {
 	obj := &StateObject{
 		Account: &Account{
-			Balance: big.NewInt(0),
-			// trie:     trie.NewTrie(),
-			Trie:     txn.state.state.NewTrie(),
+			Balance:  big.NewInt(0),
+			Trie:     txn.state.NewSnapshot(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},
@@ -470,7 +465,7 @@ func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
 	txn.txn.Delete(refundIndex)
 }
 
-func (txn *Txn) Commit(deleteEmptyObjects bool) (*Snapshot, []byte) {
+func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 	txn.cleanDeleteObjects(deleteEmptyObjects)
 
 	x := txn.txn.Commit()
@@ -505,12 +500,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*Snapshot, []byte) {
 		fmt.Println("##################################################################################")
 	*/
 
-	t, hash := txn.snapshot.tt.Commit(x)
-
-	newState := &Snapshot{
-		state: txn.state,
-		tt:    t,
-	}
-
-	return newState, hash
+	t, hash := txn.snapshot.Commit(x)
+	return t, hash
 }

@@ -26,13 +26,13 @@ func (s *State) addState(root common.Hash, t *Trie) {
 	s.cache.Add(root, t)
 }
 
-func (s *State) NewTrie() state.TrieX {
+func (s *State) NewSnapshot() state.Snapshot {
 	t, _ := s.newTrieAtImpl(common.Hash{})
 	t.state = s
 	return t
 }
 
-func (s *State) NewTrieAt(root common.Hash) (state.TrieX, error) {
+func (s *State) NewSnapshotAt(root common.Hash) (state.Snapshot, error) {
 	// Check locally.
 	tt, ok := s.cache.Get(root)
 	if ok {
