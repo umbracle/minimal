@@ -1,20 +1,6 @@
 package state
 
-import (
-	"fmt"
-	"math/big"
-	"testing"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/umbracle/minimal/chain"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
-	"github.com/umbracle/minimal/state/runtime"
-	"github.com/umbracle/minimal/state/runtime/evm"
-)
-
+/*
 func TestExecutor(t *testing.T) {
 	fmt.Println("-- executor --")
 
@@ -136,7 +122,6 @@ func TestTransition(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fmt.Println(c)
 
-			/*
 				s := NewState()
 				s = buildPreState(s, c.PreState)
 
@@ -153,8 +138,8 @@ func TestTransition(t *testing.T) {
 				} else if c.Err != "" {
 					t.Fatalf("It did not failed (%s)", c.Err)
 				}
-			*/
 
 		})
 	}
 }
+*/

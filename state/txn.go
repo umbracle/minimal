@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/umbracle/minimal/state/shared"
 
 	"golang.org/x/crypto/sha3"
 
@@ -19,7 +18,7 @@ var (
 	ErrInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
 )
 
-var emptyCodeHash = crypto.Keccak256(nil)
+// var emptyCodeHash = crypto.Keccak256(nil)
 
 var emptyStateHash = common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
@@ -87,7 +86,7 @@ func (txn *Txn) RevertToSnapshot(id int) {
 }
 
 // GetAccount returns an account
-func (txn *Txn) GetAccount(addr common.Address) (*shared.Account, bool) {
+func (txn *Txn) GetAccount(addr common.Address) (*Account, bool) {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return nil, false
@@ -95,10 +94,10 @@ func (txn *Txn) GetAccount(addr common.Address) (*shared.Account, bool) {
 	return object.Account, true
 }
 
-func (txn *Txn) getStateObject(addr common.Address) (*shared.StateObject, bool) {
+func (txn *Txn) getStateObject(addr common.Address) (*StateObject, bool) {
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
-		obj := val.(*shared.StateObject)
+		obj := val.(*StateObject)
 		if obj.Deleted {
 			return nil, false
 		}
@@ -112,7 +111,7 @@ func (txn *Txn) getStateObject(addr common.Address) (*shared.StateObject, bool) 
 		return nil, false
 	}
 
-	var account shared.Account
+	var account Account
 	err := rlp.DecodeBytes(data, &account)
 	if err != nil {
 		return nil, false
@@ -131,17 +130,17 @@ func (txn *Txn) getStateObject(addr common.Address) (*shared.StateObject, bool) 
 		}
 	}
 
-	obj := &shared.StateObject{
+	obj := &StateObject{
 		Account: account.Copy(),
 	}
 	return obj, true
 }
 
-func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *shared.StateObject)) {
+func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *StateObject)) {
 	object, exists := txn.getStateObject(addr)
 	if !exists && create {
-		object = &shared.StateObject{
-			Account: &shared.Account{
+		object = &StateObject{
+			Account: &Account{
 				Balance: big.NewInt(0),
 				// trie:     trie.NewTrie(),
 				Trie:     txn.state.state.NewTrie(),
@@ -160,7 +159,7 @@ func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *s
 }
 
 func (txn *Txn) AddSealingReward(addr common.Address, balance *big.Int) {
-	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Suicide {
 			*object = *newStateObject(txn)
 			object.Account.Balance.SetBytes(balance.Bytes())
@@ -177,7 +176,7 @@ func (txn *Txn) AddBalance(addr common.Address, balance *big.Int) {
 			return
 		}
 	*/
-	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Add(object.Account.Balance, balance)
 	})
 }
@@ -187,14 +186,14 @@ func (txn *Txn) SubBalance(addr common.Address, balance *big.Int) {
 	if balance.Sign() == 0 {
 		return
 	}
-	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Sub(object.Account.Balance, balance)
 	})
 }
 
 // SetBalance sets the balance
 func (txn *Txn) SetBalance(addr common.Address, balance *big.Int) {
-	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
 	})
 }
@@ -236,7 +235,7 @@ func isZeros(b []byte) bool {
 
 // SetState change the state of an address
 func (txn *Txn) SetState(addr common.Address, key, value common.Hash) {
-	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Txn == nil {
 			object.Txn = iradix.New().Txn()
 		}
@@ -273,7 +272,7 @@ func (txn *Txn) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // SetNonce reduces the balance
 func (txn *Txn) SetNonce(addr common.Address, nonce uint64) {
-	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Nonce = nonce
 	})
 }
@@ -291,7 +290,7 @@ func (txn *Txn) GetNonce(addr common.Address) uint64 {
 
 // SetCode sets the code for an address
 func (txn *Txn) SetCode(addr common.Address, code []byte) {
-	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.CodeHash = crypto.Keccak256Hash(code).Bytes()
 		object.DirtyCode = true
 		object.Code = code
@@ -329,7 +328,7 @@ func (txn *Txn) GetCodeHash(addr common.Address) common.Hash {
 // Suicide marks the given account as suicided
 func (txn *Txn) Suicide(addr common.Address) bool {
 	var suicided bool
-	txn.upsertAccount(addr, false, func(object *shared.StateObject) {
+	txn.upsertAccount(addr, false, func(object *StateObject) {
 		if object == nil || object.Suicide {
 			suicided = false
 		} else {
@@ -402,9 +401,9 @@ func (txn *Txn) Empty(addr common.Address) bool {
 	return obj.Empty()
 }
 
-func newStateObject(txn *Txn) *shared.StateObject {
-	return &shared.StateObject{
-		Account: &shared.Account{
+func newStateObject(txn *Txn) *StateObject {
+	return &StateObject{
+		Account: &Account{
 			Balance: big.NewInt(0),
 			// trie:     trie.NewTrie(),
 			Trie:     txn.state.state.NewTrie(),
@@ -415,8 +414,8 @@ func newStateObject(txn *Txn) *shared.StateObject {
 }
 
 func (txn *Txn) CreateAccount(addr common.Address) {
-	obj := &shared.StateObject{
-		Account: &shared.Account{
+	obj := &StateObject{
+		Account: &Account{
 			Balance: big.NewInt(0),
 			// trie:     trie.NewTrie(),
 			Trie:     txn.state.state.NewTrie(),
@@ -442,7 +441,7 @@ func hashit(k []byte) []byte {
 func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
 	remove := [][]byte{}
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
-		a, ok := v.(*shared.StateObject)
+		a, ok := v.(*StateObject)
 		if !ok {
 			return false
 		}
@@ -457,7 +456,7 @@ func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
 		if !ok {
 			panic("it should not happen")
 		}
-		obj, ok := v.(*shared.StateObject)
+		obj, ok := v.(*StateObject)
 		if !ok {
 			panic("it should not happen")
 		}
@@ -480,7 +479,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*Snapshot, []byte) {
 		fmt.Println("##################################################################################")
 
 		x.Root().Walk(func(k []byte, v interface{}) bool {
-			a, ok := v.(*shared.StateObject)
+			a, ok := v.(*StateObject)
 			if !ok {
 				// We also have logs, avoid those
 				return false

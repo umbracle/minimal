@@ -1,13 +1,6 @@
 package shared
 
-import (
-	"fmt"
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
-	iradix "github.com/hashicorp/go-immutable-radix"
-)
-
+/*
 type State interface {
 	NewTrieAt(common.Hash) (Trie, error)
 	NewTrie() Trie
@@ -48,3 +41,4 @@ func (a *Account) Copy() *Account {
 
 	return aa
 }
+*/

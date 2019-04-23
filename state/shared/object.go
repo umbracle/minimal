@@ -1,15 +1,6 @@
 package shared
 
-import (
-	"bytes"
-
-	iradix "github.com/hashicorp/go-immutable-radix"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
-)
-
+/*
 var emptyCodeHash = crypto.Keccak256(nil)
 
 // StateObject is the internal representation of the account
@@ -56,3 +47,4 @@ func (s *StateObject) Copy() *StateObject {
 
 	return ss
 }
+*/
