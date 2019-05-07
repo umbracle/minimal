@@ -1237,7 +1237,10 @@ func (c *Contract) executeExtCodeCopy() error {
 }
 
 func (c *Contract) memoryResize(gasPrice uint64, offset *big.Int, length *big.Int) error {
-	totalSize := big.NewInt(1).Add(offset, length)
+	totalSize := big.NewInt(0)
+	if length.Sign() != 0 {
+		totalSize.Add(offset, length)
+	}
 
 	// Check that the new size of the memory does not overflow
 	words, overflow := bigUint64(totalSize)
