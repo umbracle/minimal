@@ -126,6 +126,9 @@ func (s *Session) p2pHandshake() error {
 		return err
 	}
 
+	fmt.Println("-- secrets --")
+	fmt.Println(secrets)
+
 	s.macCipher, err = aes.NewCipher(secrets.MAC)
 	if err != nil {
 		return err
@@ -181,6 +184,7 @@ func (s *Session) RemoteIDString() string {
 // Handshake does the p2p and protocol handshake
 func (s *Session) Handshake() error {
 	if err := s.p2pHandshake(); err != nil {
+		panic(err)
 		return err
 	}
 	info, err := doProtocolHandshake(s, s.Info)
