@@ -125,10 +125,7 @@ func (s *Session) p2pHandshake() error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("-- secrets --")
-	fmt.Println(secrets)
-
+	
 	s.macCipher, err = aes.NewCipher(secrets.MAC)
 	if err != nil {
 		return err

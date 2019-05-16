@@ -22,7 +22,6 @@ const (
 	MaxCodeSize            = 24576
 )
 
-// var emptyCodeHashTwo = crypto.Keccak256Hash(nil)
 var emptyCodeHashTwo = common.BytesToHash(crypto.Keccak256(nil))
 
 var builtinRuntimes = map[string]runtime.Runtime{
