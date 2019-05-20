@@ -16,9 +16,7 @@ import (
 	"github.com/umbracle/minimal/crypto"
 )
 
-func newTestDiscovery(config *Config, capturePacket bool) *Backend {
-	// logger := log.New(ioutil.Discard, "", log.LstdFlags)
-
+func newTestDiscovery(t *testing.T, transport Transport, capturePacket bool) *Backend {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Output: ioutil.Discard,
 	})
