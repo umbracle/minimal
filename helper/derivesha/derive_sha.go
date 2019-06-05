@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	newRlp "github.com/umbracle/go-rlp"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
@@ -48,6 +49,12 @@ func CalcTxsRoot(transactions []*types.Transaction) types.Hash {
 		rlp.Encode(keybuf, uint(indx))
 
 		enc, _ := rlp.EncodeToBytes(transaction)
+
+		buf2, _ := newRlp.EncodeToBytes(transaction)
+		if !bytes.Equal(enc, buf2) {
+			panic("xx")
+		}
+
 		txn.Insert(keybuf.Bytes(), enc)
 	}
 

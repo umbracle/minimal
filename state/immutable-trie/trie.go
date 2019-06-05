@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
+	newRlp "github.com/umbracle/go-rlp"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
@@ -396,6 +397,12 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 					localTxn.Delete(k)
 				} else {
 					vv, _ := rlp.EncodeToBytes(bytes.TrimLeft(v.([]byte), "\x00"))
+
+					buf2, _ := newRlp.EncodeToBytes(bytes.TrimLeft(v.([]byte), "\x00"))
+					if !bytes.Equal(vv, buf2) {
+						panic("xx")
+					}
+
 					localTxn.Insert(k, vv)
 				}
 				return false
@@ -417,6 +424,11 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 		data, err := rlp.EncodeToBytes(a.Account)
 		if err != nil {
 			panic(err)
+		}
+
+		buf2, _ := newRlp.EncodeToBytes(a.Account)
+		if !bytes.Equal(data, buf2) {
+			panic("xx")
 		}
 
 		tt.Insert(hashit(k), data)

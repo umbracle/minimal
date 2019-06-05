@@ -1,13 +1,17 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/types"
+
+	newRlp "github.com/umbracle/go-rlp"
 )
 
 // prefix
@@ -198,6 +202,21 @@ func (s *KeyValueStorage) write(p []byte, k []byte, obj interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode rlp: %v", err)
 	}
+
+	buf2, _ := newRlp.EncodeToBytes(obj)
+	if !bytes.Equal(data, buf2) {
+
+		fmt.Println(data)
+		fmt.Println(buf2)
+
+		fmt.Println("-- obj --")
+		fmt.Println(obj)
+
+		fmt.Println(hex.EncodeToString(data))
+
+		panic("xx")
+	}
+
 	return s.set(p, k, data)
 }
 
