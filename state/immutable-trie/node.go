@@ -11,8 +11,7 @@ import (
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/ethereum/go-ethereum/rlp"
-	newRlp "github.com/umbracle/go-rlp"
+	"github.com/umbracle/minimal/rlp"
 )
 
 var (
@@ -299,12 +298,6 @@ func encodeKeyValue(key, val []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-
-	buf2, _ := newRlp.EncodeToBytes(&kk{Key: key, Val: val})
-	if !bytes.Equal(dd, buf2) {
-		panic("xx")
-	}
-
 	return dd
 }
 

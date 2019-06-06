@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -13,8 +12,7 @@ import (
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/ethereum/go-ethereum/rlp"
-	newRlp "github.com/umbracle/go-rlp"
+	"github.com/umbracle/minimal/rlp"
 )
 
 var (
@@ -53,15 +51,6 @@ func CreateAddress(addr types.Address, nonce uint64) types.Address {
 		addr,
 		nonce,
 	})
-
-	buf2, _ := newRlp.EncodeToBytes([]interface{}{
-		addr,
-		nonce,
-	})
-	if !bytes.Equal(buf, buf2) {
-		panic("xx")
-	}
-
 	return types.BytesToAddress(Keccak256(buf)[12:])
 }
 

@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bytes"
 	"fmt"
 	"hash"
 	"math/big"
@@ -10,8 +9,7 @@ import (
 
 	goHex "encoding/hex"
 
-	"github.com/ethereum/go-ethereum/rlp"
-	newRlp "github.com/umbracle/go-rlp"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/hex"
 	"golang.org/x/crypto/sha3"
 )
@@ -253,14 +251,7 @@ func (r *Receipt) ConsensusEncode() ([]byte, error) {
 		logs,
 	}
 
-	data, err := rlp.EncodeToBytes(obj)
-
-	buf2, _ := newRlp.EncodeToBytes(obj)
-	if !bytes.Equal(data, buf2) {
-		panic("xx")
-	}
-
-	return data, err
+	return rlp.EncodeToBytes(obj)
 }
 
 type Log struct {
