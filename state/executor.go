@@ -174,6 +174,9 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 
 	var vmerr error
 
+	// fmt.Println("__ PRE CHECK __")
+	// fmt.Println(txn.GetCommittedState(types.StringToAddress("0xa8fe32590c78b3262702f63a2eb7b92cd6da04b2"), types.StringToHash("038429228193262561040502452574783263471903397560875062858804733497054584754016")))
+
 	if !dryRun {
 		// e := evm.NewEVM(txn, env, config, gasTable, getHash)
 		// e.SetPrecompiled(builtins)

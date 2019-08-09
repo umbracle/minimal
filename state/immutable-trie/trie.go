@@ -105,7 +105,16 @@ func NewTrie() *Trie {
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {
 	txn := t.Txn()
+
+	// fmt.Println("-- lookup --")
+	// fmt.Println(hex.EncodeToHex(k))
+
+	// txn.Show()
+
 	res := txn.Lookup(k)
+
+	// txn.Show()
+
 	return res, res != nil
 }
 
@@ -275,6 +284,11 @@ func (t *Txn) writeNode(n *FullNode) *FullNode {
 }
 
 func (t *Txn) Insert(key, value []byte) {
+	/*
+		fmt.Println("-- insert --")
+		fmt.Println(hex.EncodeToHex(key))
+		fmt.Println(hex.EncodeToHex(value))
+	*/
 	root := t.insert(t.root, keybytesToHex(key), value)
 	if root != nil {
 		t.root = root
@@ -541,14 +555,14 @@ func show(obj interface{}, label int, d int) {
 	case *ShortNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d SHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			return
+			// return
 		}
 		fmt.Printf("%s%d Short: %s\n", depth(d), label, hex.EncodeToHex(n.key))
 		show(n.child, 0, d)
 	case *FullNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d FHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			return
+			// return
 		}
 		fmt.Printf("%s%d Full\n", depth(d), label)
 		for indx, i := range n.children {

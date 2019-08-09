@@ -2,14 +2,17 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"hash"
 	"math/big"
+	"strconv"
 
 	"golang.org/x/crypto/sha3"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/types"
 
 	"github.com/umbracle/minimal/rlp"
@@ -480,35 +483,33 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 
 	x := txn.txn.Commit()
 
-	/*
-		fmt.Println("##################################################################################")
+	fmt.Println("##################################################################################")
 
-		x.Root().Walk(func(k []byte, v interface{}) bool {
-			a, ok := v.(*StateObject)
-			if !ok {
-				// We also have logs, avoid those
-				return false
-			}
-			fmt.Printf("# ----------------- %s -------------------\n", hex.EncodeToHex(k))
-			fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
-			fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
-			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
-			fmt.Printf("# Code hash: %s\n", hex.EncodeToHex(a.Account.CodeHash))
-			fmt.Printf("# State root: %s\n", a.Account.Root.String())
-			if a.Txn != nil {
-				a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
-					if v == nil {
-						fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(k))
-					} else {
-						fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(k), hex.EncodeToHex(v.([]byte)))
-					}
-					return false
-				})
-			}
+	x.Root().Walk(func(k []byte, v interface{}) bool {
+		a, ok := v.(*StateObject)
+		if !ok {
+			// We also have logs, avoid those
 			return false
-		})
-		fmt.Println("##################################################################################")
-	*/
+		}
+		fmt.Printf("# ----------------- %s -------------------\n", hex.EncodeToHex(k))
+		fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
+		fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
+		fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
+		fmt.Printf("# Code hash: %s\n", hex.EncodeToHex(a.Account.CodeHash))
+		fmt.Printf("# State root: %s\n", a.Account.Root.String())
+		if a.Txn != nil {
+			a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
+				if v == nil {
+					fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(k))
+				} else {
+					fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(k), hex.EncodeToHex(v.([]byte)))
+				}
+				return false
+			})
+		}
+		return false
+	})
+	fmt.Println("##################################################################################")
 
 	t, hash := txn.snapshot.Commit(x)
 	return t, hash

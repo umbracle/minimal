@@ -1,8 +1,10 @@
 package evm
 
 import (
+	"fmt"
 	"math/big"
 	"math/bits"
+	"os"
 	"sync"
 
 	"github.com/umbracle/minimal/chain"
@@ -448,7 +450,21 @@ func opSload(c *state) {
 	}
 
 	val := c.evm.state.GetState(c.address, bigToHash(loc))
+
+	if c.address == types.StringToAddress("0xa8fe32590c78b3262702f63a2eb7b92cd6da04b2") {
+		fmt.Println("-- sload --")
+		fmt.Println(c.address)
+		fmt.Println(bigToHash(loc))
+		fmt.Println(val)
+	}
+
 	loc.SetBytes(val.Bytes())
+
+	if c.gas == 4676242 {
+		if c.evm.env.Number == 1419068 {
+			os.Exit(0)
+		}
+	}
 }
 
 func opSStore(c *state) {
@@ -462,6 +478,15 @@ func opSStore(c *state) {
 	loc, val := c.pop(), c.pop()
 
 	var gas uint64
+
+	/**
+	if c.address == types.StringToAddress("0xa8fe32590c78b3262702f63a2eb7b92cd6da04b2") {
+		fmt.Println("-- sstore --")
+		fmt.Println(address)
+		fmt.Println(bigToHash(loc))
+		fmt.Println(bigToHash(val))
+	}
+	*/
 
 	current := c.evm.state.GetState(address, bigToHash(loc))
 

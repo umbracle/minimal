@@ -10,17 +10,24 @@ import (
 
 type State struct {
 	storage Storage
-	cache   *lru.Cache
+	cache   *lru.TwoQueueCache
 }
 
 func NewState(storage Storage) *State {
-	cache, _ := lru.New(128)
+
+	// cache, _ := lru.NewARC(128)
+	cache, _ := lru.New2Q(128)
 
 	s := &State{
 		storage: storage,
 		cache:   cache,
 	}
 	return s
+}
+
+func (s *State) Do() {
+
+	// s.NewSnapshotAt(types.StringToHash("0x45034d234555cff5a436be68f3096dcc012197623c9532c6bbeea24617ffe619"))
 }
 
 func (s *State) NewSnapshot() state.Snapshot {
@@ -39,10 +46,27 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 }
 
 func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
+
+	/*
+		correct := false
+		if root.String() == "0x45034d234555cff5a436be68f3096dcc012197623c9532c6bbeea24617ffe619" {
+			correct = true
+			fmt.Printf("New snapshot at: %s\n", root.String())
+		}
+	*/
+
 	tt, ok := s.cache.Get(root)
 	if ok {
 		t := tt.(*Trie)
 		t.state = s
+
+		/*
+			if correct {
+				fmt.Println(&(tt.(*Trie).root))
+				fmt.Println(tt.(*Trie).root.(*FullNode))
+			}
+		*/
+
 		return tt.(*Trie), nil
 	}
 	n, ok, err := GetNode(root.Bytes(), s.storage)
@@ -61,5 +85,12 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 }
 
 func (s *State) AddState(root types.Hash, t *Trie) {
+	/*
+		if root.String() == "0x45034d234555cff5a436be68f3096dcc012197623c9532c6bbeea24617ffe619" {
+			fmt.Println("==> ADD STATE")
+			fmt.Println(&t.root)
+			fmt.Println(t.root.(*FullNode))
+		}
+	*/
 	s.cache.Add(root, t)
 }

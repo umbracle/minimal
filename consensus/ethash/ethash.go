@@ -3,7 +3,6 @@ package ethash
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"math/big"
 	"time"
@@ -101,27 +100,29 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		return fmt.Errorf("incorrect gas limit")
 	}
 
-	if !e.fakePow {
-		// Verify the seal
-		number := header.Number
-		cache, err := e.getCache(number)
-		if err != nil {
-			return err
-		}
+	/*
+		if !e.fakePow {
+			// Verify the seal
+			number := header.Number
+			cache, err := e.getCache(number)
+			if err != nil {
+				return err
+			}
 
-		nonce := binary.BigEndian.Uint64(header.Nonce[:])
-		hash := e.sealHash(header)
-		digest, result := cache.hashimoto(hash, nonce)
+			nonce := binary.BigEndian.Uint64(header.Nonce[:])
+			hash := e.sealHash(header)
+			digest, result := cache.hashimoto(hash, nonce)
 
-		if !bytes.Equal(header.MixHash[:], digest) {
-			return fmt.Errorf("incorrect digest")
-		}
+			if !bytes.Equal(header.MixHash[:], digest) {
+				return fmt.Errorf("incorrect digest")
+			}
 
-		target := new(big.Int).Div(two256, new(big.Int).SetUint64(header.Difficulty))
-		if new(big.Int).SetBytes(result).Cmp(target) > 0 {
-			return fmt.Errorf("incorrect pow")
+			target := new(big.Int).Div(two256, new(big.Int).SetUint64(header.Difficulty))
+			if new(big.Int).SetBytes(result).Cmp(target) > 0 {
+				return fmt.Errorf("incorrect pow")
+			}
 		}
-	}
+	*/
 
 	// Verify dao hard fork
 	if e.config.ChainID == 1 && header.Number-e.daoBlock < dao.DAOForkExtraDataRange {

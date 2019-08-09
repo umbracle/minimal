@@ -751,6 +751,10 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 
 	s2, root := txn.Commit(config.EIP155)
 
+	/*
+		fmt.Println("-- everything is done now --")
+		b.state.Do()
+	*/
 	return s2, root, receipts, totalGas, nil
 }
 
