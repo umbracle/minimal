@@ -71,8 +71,13 @@ func (s *StateObject) Empty() bool {
 func (s *StateObject) GetCommitedState(hash types.Hash) types.Hash {
 	val, ok := s.Account.Trie.Get(hash.Bytes())
 	if !ok {
+
+		fmt.Println("- not found -")
 		return types.Hash{}
 	}
+
+	fmt.Println("- from db -")
+	fmt.Println(val)
 
 	i := rlp.NewIterator(val)
 

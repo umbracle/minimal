@@ -177,6 +177,9 @@ func (t *Txn) hash(node Node, h *hasher, a *rlpv2.Arena, d int) *rlpv2.Value {
 	tmp := h.Hash(h.buf)
 	hh := node.SetHash(tmp)
 
+	//fmt.Println("····· SET HASH ·······")
+	//fmt.Println(hex.EncodeToHex(hh))
+
 	// Write data
 	if t.batch != nil {
 		t.batch.Put(tmp, h.buf)

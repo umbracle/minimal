@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"hash"
 	"math/big"
 
@@ -270,8 +271,16 @@ func (txn *Txn) GetState(addr types.Address, hash types.Hash) types.Hash {
 
 	k := txn.hashit(nil, hash.Bytes())
 
+	fmt.Println(addr.String())
+
+	fmt.Println("-- k --")
+	fmt.Println(k)
+
 	if object.Txn != nil {
+		fmt.Println("- check in -")
 		if val, ok := object.Txn.Get(k); ok {
+			fmt.Println("- from in -")
+			fmt.Println(val)
 			if val == nil {
 				return types.Hash{}
 			}

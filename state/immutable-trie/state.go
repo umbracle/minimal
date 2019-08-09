@@ -39,6 +39,9 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 }
 
 func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
+	fmt.Println("-------------------- New snapshot")
+	fmt.Println(root.String())
+
 	tt, ok := s.cache.Get(root)
 	if ok {
 		t := tt.(*Trie)

@@ -1,8 +1,10 @@
 package evm
 
 import (
+	"fmt"
 	"math/big"
 	"math/bits"
+	"os"
 	"sync"
 
 	"github.com/umbracle/minimal/chain"
@@ -440,6 +442,8 @@ func opMStore8(c *state) {
 
 // --- storage ---
 
+var cc int
+
 func opSload(c *state) {
 	loc := c.top()
 
@@ -447,7 +451,20 @@ func opSload(c *state) {
 		return
 	}
 
+	fmt.Println("-- sload --")
+
 	val := c.evm.state.GetState(c.address, bigToHash(loc))
+
+	fmt.Println(loc)
+	fmt.Println(val)
+
+	if c.gas == 4676242 {
+		//if cc == 1 {
+		os.Exit(0)
+		//}
+		cc++
+	}
+
 	loc.SetBytes(val.Bytes())
 }
 
@@ -460,6 +477,13 @@ func opSStore(c *state) {
 	address := c.address
 
 	loc, val := c.pop(), c.pop()
+
+	/*
+		fmt.Println("- store -")
+		fmt.Println(address)
+		fmt.Println(loc)
+		fmt.Println(val)
+	*/
 
 	var gas uint64
 
@@ -877,10 +901,18 @@ func opJump(c *state) {
 func opJumpi(c *state) {
 	dest := c.pop()
 	cond := c.pop()
+	/*
+		fmt.Println("-- dest --")
+		fmt.Println(dest)
 
+		fmt.Println("-- cond --")
+		fmt.Println(cond)
+	*/
 	if cond.Sign() != 0 {
 		if c.validJumpdest(dest) {
 			c.ip = int(dest.Uint64() - 1)
+
+			// fmt.Println(c.ip)
 		} else {
 			c.exit(errInvalidJump)
 		}

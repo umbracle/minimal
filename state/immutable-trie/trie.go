@@ -105,7 +105,16 @@ func NewTrie() *Trie {
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {
 	txn := t.Txn()
+
+	txn.Show()
+
 	res := txn.Lookup(k)
+
+	fmt.Println("---- 15 -----")
+	fmt.Println(txn.root.(*FullNode).getEdge(4))
+
+	txn.Show()
+
 	return res, res != nil
 }
 
@@ -214,15 +223,24 @@ func (t *Txn) Commit() *Trie {
 }
 
 func (t *Txn) Lookup(key []byte) []byte {
+	fmt.Println("## Lookup ##")
+	fmt.Println(hex.EncodeToHex(key))
 	return t.lookup(t.root, keybytesToHex(key))
 }
 
 func (t *Txn) lookup(node interface{}, key []byte) []byte {
+	// fmt.Println("-- lookup --")
+	// fmt.Println(key)
+
 	switch n := node.(type) {
 	case nil:
 		return nil
 
 	case *ValueNode:
+		fmt.Println("- value node -")
+		fmt.Println(n)
+		fmt.Println(hex.EncodeToHex(n.buf))
+
 		if n.hash {
 			nc, ok, err := GetNode(n.buf, t.storage)
 			if err != nil {
@@ -242,6 +260,7 @@ func (t *Txn) lookup(node interface{}, key []byte) []byte {
 		}
 
 	case *ShortNode:
+		fmt.Println("- short node -")
 		plen := len(n.key)
 		if plen > len(key) || !bytes.Equal(key[:plen], n.key) {
 			return nil
@@ -250,6 +269,8 @@ func (t *Txn) lookup(node interface{}, key []byte) []byte {
 		}
 
 	case *FullNode:
+		fmt.Println("-- full node --")
+
 		if len(key) == 0 {
 			return t.lookup(n.value, key)
 		} else {
@@ -541,14 +562,14 @@ func show(obj interface{}, label int, d int) {
 	case *ShortNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d SHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			return
+			//return
 		}
 		fmt.Printf("%s%d Short: %s\n", depth(d), label, hex.EncodeToHex(n.key))
 		show(n.child, 0, d)
 	case *FullNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d FHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			return
+			//return
 		}
 		fmt.Printf("%s%d Full\n", depth(d), label)
 		for indx, i := range n.children {
@@ -565,6 +586,8 @@ func show(obj interface{}, label int, d int) {
 		} else {
 			fmt.Printf("%s%d  Value: %s\n", depth(d), label, hex.EncodeToHex(n.buf))
 		}
+	case nil:
+		fmt.Printf("%s nil\n", depth(d))
 	default:
 		panic("not expected")
 	}
