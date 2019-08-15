@@ -238,6 +238,12 @@ func (h *Header) computeHash() Hash {
 	return BytesToHash(arena.HashTo(nil, v))
 }
 
+func (h *Header) ComputeHash() Hash {
+	v := h.computeHash()
+	h.hash.Store(v)
+	return v
+}
+
 func (h *Header) Hash() Hash {
 	if hash := h.hash.Load(); hash != nil {
 		return hash.(Hash)

@@ -54,6 +54,8 @@ type Backend struct {
 	wakeCh   chan struct{}
 	taskCh   chan struct{}
 	commitCh chan []*element
+
+	watcher *Watch
 }
 
 func Factory(ctx context.Context, logger hclog.Logger, m interface{}, config map[string]interface{}) (protocol.Backend, error) {
@@ -83,6 +85,8 @@ func NewBackend(minimal *minimal.Minimal, logger hclog.Logger, blockchain *block
 		wakeCh:    make(chan struct{}, 10),
 		taskCh:    make(chan struct{}, maxConcurrentTasks),
 		commitCh:  make(chan []*element, 10),
+
+		watcher: &Watch{},
 	}
 
 	header, ok := blockchain.Header()
@@ -133,6 +137,8 @@ func (b *Backend) Protocols() []*network.Protocol {
 
 // Run implements the protocol interface
 func (b *Backend) Run() {
+	return
+
 	go b.runSync()
 	go b.commitData()
 }
@@ -255,6 +261,13 @@ func (b *Backend) runSync() {
 func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
 	for {
 		w := <-watch
+
+		fmt.Println("** WATCH **")
+
+		// check this in detail in geth. exactly how it does it??????
+
+		go b.broadcastHashMsg(w.Block.Hash(), w.Block.Number())
+
 		// TODO, change with a blockchain listener
 		go b.broadcastBlockMsg(w.Block)
 	}
@@ -272,6 +285,8 @@ func (b *Backend) broadcastHashMsg(hash types.Hash, number uint64) {
 
 func (b *Backend) broadcastBlockMsg(block *types.Block) {
 	// total difficulty so far at the parent
+
+	// TODO, get the difficulty from the sealer without query
 	diff, ok := b.blockchain.GetTD(block.ParentHash())
 	if !ok {
 		// log error
@@ -285,7 +300,7 @@ func (b *Backend) broadcastBlockMsg(block *types.Block) {
 
 	for _, i := range b.peers {
 		if err := i.SendNewBlock(block, blockDiff); err != nil {
-			fmt.Printf("Failed to send send block to peer %s: %v\n", i.peerID, err)
+			b.logger.Warn("Failed to send new block", "peer", i.peerID, "err", err)
 		}
 	}
 }
@@ -338,6 +353,8 @@ func (b *Backend) Add(conn net.Conn, peer *network.Peer) (network.ProtocolHandle
 		return nil, fmt.Errorf("failed to fetch height: %v", err)
 	}
 
+	proto.updateHeigh(header.Number)
+
 	b.updateChain(header.Number)
 	b.addPeer(peerID, proto)
 	b.logger.Trace("add node", "id", peerID)
@@ -359,7 +376,7 @@ func (b *Backend) Deliver(context string, peerID string, id uint32, data interfa
 
 	if err != nil {
 		// TODO, we need to set here the thing that was not deliver as waiting to be dequeued again
-		fmt.Printf("=> Failed to deliver peer %s %s (%d): %v\n", context, peerID, id, err)
+		// fmt.Printf("=> Failed to deliver peer %s %s (%d): %v\n", context, peerID, id, err)
 
 		// b.logger.Trace("failed to deliver", context, "peer", peerID, "job", id)
 

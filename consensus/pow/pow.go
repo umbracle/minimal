@@ -3,6 +3,7 @@ package pow
 import (
 	"context"
 	crand "crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
@@ -32,11 +33,9 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
-	/*
-		if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
-			return fmt.Errorf("invalid sequence")
-		}
-	*/
+	if header.Number != parent.Number+1 {
+		return fmt.Errorf("invalid sequence")
+	}
 	if header.Difficulty < p.min {
 		return fmt.Errorf("Difficulty not correct. '%d' <! '%d'", header.Difficulty, p.min)
 	}
@@ -63,10 +62,9 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 
 	target := new(big.Int).Div(two256, new(big.Int).SetUint64(header.Difficulty))
 	for {
-		// header.Nonce = types.EncodeNonce(uint64(nonce))
+		binary.BigEndian.PutUint64(header.Nonce[:], nonce)
 
-		hash := header.Hash()
-
+		hash := header.ComputeHash()
 		if big.NewInt(1).SetBytes(hash.Bytes()).Cmp(target) < 0 {
 			break
 		}

@@ -186,7 +186,7 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	sealerConfig := &sealer.Config{
 		CommitInterval: 5 * time.Second,
 	}
-	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus)
+	m.Sealer = sealer.NewSealer(sealerConfig, logger.ResetNamed("sealer"), m.Blockchain, m.consensus)
 	m.Sealer.SetEnabled(m.config.Seal)
 	m.Sealer.SetCoinbase(crypto.PubKeyToAddress(&m.Key.PublicKey))
 

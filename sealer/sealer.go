@@ -91,6 +91,8 @@ func (s *Sealer) SetEnabled(enabled bool) {
 func (s *Sealer) run(ctx context.Context) {
 	listener := s.blockchain.Subscribe()
 
+	s.commitInterval.Reset(1 * time.Second)
+
 	for {
 		select {
 		case <-listener:
@@ -98,6 +100,7 @@ func (s *Sealer) run(ctx context.Context) {
 
 		case <-s.commitInterval.C:
 			go s.commit()
+			s.commitInterval.Reset(s.config.CommitInterval)
 
 		case <-ctx.Done():
 			return
@@ -113,9 +116,13 @@ func (s *Sealer) AddTx(tx *types.Transaction) {
 func generateNewBlock(header *types.Header, txs []*types.Transaction) *types.Block {
 	if len(txs) == 0 {
 		header.TxRoot = types.EmptyRootHash
+		header.ReceiptsRoot = types.EmptyRootHash
 	} else {
 		header.TxRoot = derivesha.CalcTxsRoot(txs)
 	}
+
+	// Dont consider uncles yet
+	header.Sha3Uncles = types.EmptyUncleHash
 
 	return &types.Block{
 		Header:       header,
@@ -135,7 +142,7 @@ func (s *Sealer) commit() {
 
 	parent, ok := s.blockchain.Header()
 	if !ok {
-		return
+		panic("header not found")
 	}
 	promoted, err := s.txPool.reset(s.lastHeader, parent)
 	if err != nil {
@@ -194,6 +201,9 @@ func (s *Sealer) commit() {
 	}
 
 	_, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
+	if err != nil {
+		panic(err)
+	}
 	header.StateRoot = types.BytesToHash(root)
 
 	// TODO, get uncles
@@ -219,8 +229,11 @@ func (s *Sealer) commit() {
 
 	// Write the new blocks
 	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-		s.logger.Error("failed to write sealed block: %v", err)
+		s.logger.Error("failed to write sealed block", "err", err.Error())
+		return
 	}
+
+	s.logger.Info("block sealed", "num", block.Header.Number)
 
 	// Write the new state
 	// s.blockchain.AddState(types.BytesToHash(root), newState)

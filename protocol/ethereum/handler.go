@@ -149,7 +149,7 @@ type Ethereum struct {
 	// header data
 	HeaderHash   types.Hash
 	HeaderDiff   *big.Int
-	HeaderNumber *big.Int
+	HeaderNumber uint64
 	headerLock   sync.Mutex
 
 	sendHeader rlpx.Header
@@ -158,6 +158,24 @@ type Ethereum struct {
 	// peer *PeerConnection
 	session network.Session
 	peerID  string
+}
+
+func (e *Ethereum) updateHeigh(num uint64) {
+	e.headerLock.Lock()
+	defer e.headerLock.Unlock()
+
+	e.HeaderNumber = num
+}
+
+func (e *Ethereum) updateStat(hash types.Hash, num uint64, diff *big.Int) {
+	e.headerLock.Lock()
+	defer e.headerLock.Unlock()
+
+	if diff != nil {
+		e.HeaderDiff = diff
+	}
+	e.HeaderNumber = num
+	e.HeaderHash = hash
 }
 
 // NotifyMsg notifies that there is a new block
@@ -303,8 +321,10 @@ func (e *Ethereum) readStatus(localStatus *Status) error {
 		return fmt.Errorf("Protocol version does not match. Found %d but expected %d", int(e.status.ProtocolVersion), int(localStatus.ProtocolVersion))
 	}
 
-	e.HeaderHash = e.status.CurrentBlock
-	e.HeaderDiff = e.status.TD
+	e.updateStat(e.status.CurrentBlock, 0, e.status.TD)
+
+	// e.HeaderHash = e.status.CurrentBlock
+	// e.HeaderDiff = e.status.TD
 
 	return nil
 }
@@ -578,12 +598,18 @@ type announcement struct {
 
 func (e *Ethereum) handleNewBlockHashesMsg(msg rlpx.Message) error {
 
-	// fmt.Printf("===> NOTIFY (%s) HASHES\n", e.peerID)
-
 	var announces []*announcement
 	if err := msg.Decode(&announces); err != nil {
 		panic(err)
 	}
+
+	// TODO, assumes its in order
+	for _, i := range announces {
+		e.updateStat(i.Hash, i.Number, nil)
+	}
+
+	// not super safe now
+	e.backend.watcher.announce(e.peerID, announces)
 
 	/*
 		for _, i := range announces {
@@ -600,16 +626,9 @@ func (e *Ethereum) handleNewBlockMsg(msg rlpx.Message) error {
 		return err
 	}
 
-	/*
-		a := request.Block.Number()
-		b := request.TD.String()
-		c := request.Block.Difficulty().String()
-	*/
-
-	// trueTD := new(big.Int).Sub(request.TD, request.Block.Difficulty())
-	// trueTD := request.TD
-
-	// fmt.Printf("===> NOTIFY (%s) Block: %d Difficulty %s. Total: %s\n", e.peerID, a.Uint64(), c, b)
+	e.updateStat(request.Block.Hash(), request.Block.Header.Number, request.Diff)
+	
+	e.backend.watcher.notify(e.peerID, &request)
 
 	/*
 		if trueTD.Cmp(e.HeaderDiff) > 0 {

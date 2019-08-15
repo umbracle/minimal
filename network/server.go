@@ -236,10 +236,16 @@ func (s *Server) Schedule() error {
 	}
 
 	go func() {
-		session, err := s.transport.Accept()
-		if err == nil {
-			if err := s.addSession(session); err != nil {
-				// log
+		for {
+			session, err := s.transport.Accept()
+			if err == nil {
+				rawURL := session.GetInfo().Enode.String()
+				if !s.isValidPeer(rawURL) {
+					continue
+				}
+				if err := s.addSession(session); err != nil {
+					// log
+				}
 			}
 		}
 	}()
@@ -410,11 +416,19 @@ func (s *Server) connect(addrs string) error {
 	return fmt.Errorf("Cannot connect to address %s", addrs)
 }
 
-func (s *Server) connectWithEnode(rawURL string) error {
+// isValidPeer checks if we are already connected with the peer or its pending
+func (s *Server) isValidPeer(rawURL string) bool {
 	if _, ok := s.peers[rawURL]; ok {
-		// TODO: add tests
-		// Trying to connect with an already connected id
-		// TODO, after disconnect do we remove the peer from this list?
+		return false
+	}
+	if _, ok := s.pendingNodes.Load(rawURL); ok {
+		return false
+	}
+	return true
+}
+
+func (s *Server) connectWithEnode(rawURL string) error {
+	if !s.isValidPeer(rawURL) {
 		return nil
 	}
 
@@ -428,6 +442,13 @@ func (s *Server) connectWithEnode(rawURL string) error {
 }
 
 func (s *Server) addSession(session Session) error {
+	rawURL := session.GetInfo().Enode.String()
+
+	s.pendingNodes.Store(rawURL, struct{}{})
+	defer func() {
+		s.pendingNodes.Delete(rawURL)
+	}()
+
 	p := newPeer(session)
 
 	instances := []*Instance{}
