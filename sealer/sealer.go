@@ -144,6 +144,9 @@ func (s *Sealer) commit() {
 	if !ok {
 		panic("header not found")
 	}
+
+	fmt.Printf("START SEALING: %d\n", parent.Number+1)
+
 	promoted, err := s.txPool.reset(s.lastHeader, parent)
 	if err != nil {
 		panic(err)
@@ -233,7 +236,7 @@ func (s *Sealer) commit() {
 		return
 	}
 
-	s.logger.Info("block sealed", "num", block.Header.Number)
+	s.logger.Info("block sealed", "num", block.Header.Number, "hash", block.Header.ComputeHash())
 
 	// Write the new state
 	// s.blockchain.AddState(types.BytesToHash(root), newState)

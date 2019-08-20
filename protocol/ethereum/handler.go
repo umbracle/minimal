@@ -3,6 +3,7 @@ package ethereum
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -104,7 +105,7 @@ func (p *pending) freeHandlersLocked() {
 	}
 }
 
-func (p *pending) consume(id string) (*callback, bool) {
+func (p *pending) consume(id string, salt []byte) (*callback, bool) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -121,6 +122,14 @@ func (p *pending) consume(id string) (*callback, bool) {
 	handler, ok := p.handler[id]
 	if !ok {
 		return nil, false
+	}
+
+	// Only applicable during timeouts
+	// TODO, test, change salt with numbers instead of bytes
+	if salt != nil {
+		if !bytes.Equal(handler.salt, salt) {
+			return nil, false
+		}
 	}
 
 	delete(p.handler, id)
@@ -626,8 +635,8 @@ func (e *Ethereum) handleNewBlockMsg(msg rlpx.Message) error {
 		return err
 	}
 
-	e.updateStat(request.Block.Hash(), request.Block.Header.Number, request.Diff)
-	
+	e.updateStat(request.Block.Hash(), request.Block.Header.Number, request.TD)
+
 	e.backend.watcher.notify(e.peerID, &request)
 
 	/*
@@ -696,7 +705,8 @@ func (a *AckMessage) Completed() bool {
 }
 
 type callback struct {
-	ack chan AckMessage
+	salt []byte
+	ack  chan AckMessage
 }
 
 var (
@@ -866,7 +876,10 @@ func (e *Ethereum) setHandler(ctx context.Context, typ messageType, key string, 
 		panic("internal. message type not found")
 	}
 
-	queue.add(key, &callback{ack})
+	salt := make([]byte, 8)
+	rand.Read(salt[:])
+
+	queue.add(key, &callback{salt, ack})
 
 	go func() {
 		select {
@@ -874,7 +887,7 @@ func (e *Ethereum) setHandler(ctx context.Context, typ messageType, key string, 
 		case <-time.After(5 * time.Second):
 		}
 
-		if _, ok := queue.consume(key); !ok {
+		if _, ok := queue.consume(key, salt); !ok {
 			// The key has already been consumed
 			return
 		}
@@ -894,7 +907,7 @@ func (e *Ethereum) consumeHandler(origin string, typ messageType, result interfa
 		panic("internal. message type not found")
 	}
 
-	callback, ok := queue.consume(origin)
+	callback, ok := queue.consume(origin, nil)
 	if !ok {
 		return false
 	}

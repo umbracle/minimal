@@ -474,12 +474,15 @@ func (s *Server) addSession(session Session) error {
 				return
 			}
 
-			instanceLock.Lock()
-			instances = append(instances, &Instance{
-				Protocol: proto,
-				Handler:  handler,
-			})
-			instanceLock.Unlock()
+			// TODO, remove (only used for testing)
+			if handler != nil {
+				instanceLock.Lock()
+				instances = append(instances, &Instance{
+					Protocol: proto,
+					Handler:  handler,
+				})
+				instanceLock.Unlock()
+			}
 			errs <- nil
 		}(stream)
 	}

@@ -50,6 +50,10 @@ func (q *queue) DisableReceipts() {
 	q.disableReceipts = true
 }
 
+func (q *queue) syncTarget() uint64 {
+	return q.back.block
+}
+
 func (q *queue) addBack(block uint64) {
 	if q.back == nil {
 		q.back = q.newItem(block)

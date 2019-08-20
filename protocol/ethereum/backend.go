@@ -56,6 +56,8 @@ type Backend struct {
 	commitCh chan []*element
 
 	watcher *Watch
+
+	syncCh chan struct{}
 }
 
 func Factory(ctx context.Context, logger hclog.Logger, m interface{}, config map[string]interface{}) (protocol.Backend, error) {
@@ -66,12 +68,12 @@ func Factory(ctx context.Context, logger hclog.Logger, m interface{}, config map
 // NewBackend creates a new ethereum backend
 func NewBackend(minimal *minimal.Minimal, logger hclog.Logger, blockchain *blockchain.Blockchain) (*Backend, error) {
 	b := &Backend{
-		logger:      logger,
-		minimal:     minimal,
-		peers:       map[string]*Ethereum{},
-		peersLock:   sync.Mutex{},
-		blockchain:  blockchain,
-		queue:       newQueue(),
+		logger:     logger,
+		minimal:    minimal,
+		peers:      map[string]*Ethereum{},
+		peersLock:  sync.Mutex{},
+		blockchain: blockchain,
+		// queue:       newQueue(),
 		counter:     0,
 		last:        0,
 		seq:         0,
@@ -85,9 +87,11 @@ func NewBackend(minimal *minimal.Minimal, logger hclog.Logger, blockchain *block
 		wakeCh:    make(chan struct{}, 10),
 		taskCh:    make(chan struct{}, maxConcurrentTasks),
 		commitCh:  make(chan []*element, 10),
-
-		watcher: &Watch{},
+		syncCh:    make(chan struct{}, 1),
 	}
+
+	b.watcher = &Watch{b: b}
+	go b.watcher.run()
 
 	header, ok := blockchain.Header()
 	if !ok {
@@ -100,9 +104,7 @@ func NewBackend(minimal *minimal.Minimal, logger hclog.Logger, blockchain *block
 		b.NetworkID = 1
 	}
 
-	b.queue.front = b.queue.newItem(header.Number + 1)
-	b.queue.head = header.Hash()
-	b.queue.DisableReceipts()
+	// b.queue.DisableReceipts()
 
 	logger.Info("Header", "num", header.Number, "hash", header.Hash().String())
 
@@ -125,6 +127,47 @@ var ETH63 = network.ProtocolSpec{
 	Length:  17,
 }
 
+func (b *Backend) getTarget(peerID string) *Ethereum {
+	b.peersLock.Lock()
+	defer b.peersLock.Unlock()
+	return b.peers[peerID]
+}
+
+func (b *Backend) replaceSyncTarget(ancestor *types.Header, target *types.Header) {
+	fmt.Println("-- replace sync target --")
+	fmt.Println(target.Number)
+
+	// need to create a new one to avoid keeping objects in memory
+	b.queue = newQueue()
+	b.queue.DisableReceipts()
+
+	b.queue.front = b.queue.newItem(ancestor.Number + 1)
+	b.queue.head = ancestor.Hash()
+
+	// becuase back is the limit, so we need one more
+	b.queue.addBack(target.Number + 1)
+	b.cleanupAll()
+}
+
+func (b *Backend) bestOne() *Ethereum {
+	b.peersLock.Lock()
+	defer b.peersLock.Unlock()
+
+	diff := new(big.Int)
+	var p *Ethereum
+	for _, i := range b.peers {
+
+		fmt.Println("-- header diff --")
+		fmt.Println(i.HeaderDiff)
+
+		if i.HeaderDiff.Cmp(diff) > 0 {
+			diff.Set(i.HeaderDiff)
+			p = i
+		}
+	}
+	return p
+}
+
 // Protocols implements the protocol interface
 func (b *Backend) Protocols() []*network.Protocol {
 	return []*network.Protocol{
@@ -137,10 +180,8 @@ func (b *Backend) Protocols() []*network.Protocol {
 
 // Run implements the protocol interface
 func (b *Backend) Run() {
-	return
-
-	go b.runSync()
 	go b.commitData()
+	go b.runSync()
 }
 
 // -- setup --
@@ -219,6 +260,10 @@ func (b *Backend) notifyAvailablePeer() {
 
 func (b *Backend) dequeueJob() *Job {
 WAIT:
+	if b.queue == nil {
+		time.Sleep(1 * time.Second)
+		goto WAIT
+	}
 	job, err := b.queue.Dequeue()
 	if err != nil {
 		panic(err)
@@ -230,7 +275,7 @@ WAIT:
 
 	// TODO, use a channel to nofify new jobs
 	// That channel will be used by syncer and watcher
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 	goto WAIT
 }
 
@@ -238,7 +283,11 @@ func (b *Backend) runSync() {
 	for {
 		w := b.peek()
 
+		fmt.Println("-- dequeue job --")
+
 		job := b.dequeueJob()
+
+		fmt.Println("DOING SOMETHING!!")
 
 		seq := b.getSeq()
 
@@ -261,8 +310,6 @@ func (b *Backend) runSync() {
 func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
 	for {
 		w := <-watch
-
-		fmt.Println("** WATCH **")
 
 		// check this in detail in geth. exactly how it does it??????
 
@@ -320,6 +367,14 @@ func (b *Backend) updateChain(block uint64) {
 func (b *Backend) Add(conn net.Conn, peer *network.Peer) (network.ProtocolHandler, error) {
 	peerID := peer.PrettyID()
 
+	// TODO, do this from the network manager
+	b.peersLock.Lock()
+	_, ok := b.peers[peerID]
+	b.peersLock.Unlock()
+	if ok {
+		return nil, nil
+	}
+
 	// use handler to create the connection
 
 	status, err := b.GetStatus()
@@ -355,11 +410,66 @@ func (b *Backend) Add(conn net.Conn, peer *network.Peer) (network.ProtocolHandle
 
 	proto.updateHeigh(header.Number)
 
-	b.updateChain(header.Number)
+	// b.updateChain(header.Number)
 	b.addPeer(peerID, proto)
 	b.logger.Trace("add node", "id", peerID)
 
+	go b.checkForNewDestiny()
+
 	return proto, nil
+}
+
+func (b *Backend) getSyncTarget() uint64 {
+	return b.queue.back.block - 1
+}
+
+func (b *Backend) checkForNewDestiny() {
+	// checks if we have to target a new destiny
+	bestPeer := b.bestOne()
+
+	fmt.Println("** best peer **")
+	fmt.Println(bestPeer.HeaderNumber)
+
+	// TODO check our own height and diff
+
+	fmt.Println("-- check stats --")
+	fmt.Println(b.blockchain.GetChainTD())
+	fmt.Println(bestPeer.HeaderDiff)
+
+	td, ok := b.blockchain.GetChainTD()
+	if !ok {
+		panic("td not found")
+	}
+	if td.Cmp(bestPeer.HeaderDiff) > 0 {
+		fmt.Println("nah. to low")
+		return
+	}
+
+	height, err := bestPeer.fetchHeight(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	ancestor, _, err := b.FindCommonAncestor(bestPeer, height)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("** ANCESTOR **")
+	fmt.Println(ancestor.Number)
+	fmt.Println(ancestor.Hash())
+
+	/*
+		fmt.Println("** FORK **")
+		fmt.Println(fork.Number)
+		fmt.Println(fork.Hash())
+	*/
+
+	// b.replaceSyncTarget(bestPeer.HeaderNumber)
+
+	// b.updateChain(bestPeer.HeaderNumber)
+
+	b.replaceSyncTarget(ancestor, height)
 }
 
 func (b *Backend) Dequeue() *Job {
@@ -476,6 +586,19 @@ func (b *Backend) commitData() {
 				}
 
 				h, _ := b.blockchain.Header()
+
+				if b.watcher != nil {
+					b.watcher.newHeaderUpdate(h.Number)
+				}
+
+				fmt.Println("***")
+				fmt.Println(h.Number)
+				fmt.Println(b.getSyncTarget())
+
+				if h.Number == b.getSyncTarget() {
+					fmt.Println("***** DONE ******")
+				}
+
 				b.logger.Info("new header number", "num", h.Number)
 			}
 		}
@@ -706,7 +829,18 @@ func (t *task) Run() bool {
 
 		t.backend.logger.Trace("sync headers", "peerID", id, "job", t.job.id, "from", job.block, "count", job.count)
 
+		fmt.Println("-- request headers --")
+		fmt.Println(job.block)
+
 		data, err = conn.RequestHeadersRangeSync(ctx, job.block, job.count)
+
+		xx := data.([]*types.Header)
+
+		fmt.Println(xx)
+		fmt.Println(xx[0].Hash())
+		fmt.Println(xx[0].ComputeHash())
+		fmt.Println(xx[0].Number)
+
 		context = "headers"
 	case *BodiesJob:
 		// fmt.Printf("SYNC BODIES (%s): %d\n", id, len(job.hashes))
