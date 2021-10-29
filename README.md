@@ -1,5 +1,7 @@
 # Minimal
 
+This repo has been archived, see [polygon-sdk](https://github.com/0xPolygon/polygon-sdk) for a more up to date version of the client.
+
 [![CircleCI](https://circleci.com/gh/umbracle/minimal.svg?style=svg)](https://circleci.com/gh/umbracle/minimal)
 [![Join the chat at https://gitter.im/umbracle/minimal](https://badges.gitter.im/umbracle/minimal.svg)](https://gitter.im/umbracle/minimal?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
